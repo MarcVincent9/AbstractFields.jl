@@ -1,0 +1,13 @@
+name = "AbstractFields"
+uuid = "a693cc06-ec20-4e35-8308-60f4515f0b44"
+authors = ["MarcVincent9 <marc.vincent282@gmail.com> and contributors"]
+version = "0.1.0"
+
+[compat]
+julia = "1"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
