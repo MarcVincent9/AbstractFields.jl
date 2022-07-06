@@ -16,7 +16,11 @@ macro abstractfields(ex)
     @capture(ex, struct T_ fields__ end) || error(
         "@abstractfields takes a struct declaration as argument")
     if @capture(T, B_ <: A_)
-        _abstractfields_dict[B] = [_abstractfields_dict[A]; fields]
+        if A in keys(_abstractfields_dict)
+            _abstractfields_dict[B] = [_abstractfields_dict[A]; fields]
+        else
+            _abstractfields_dict[B] = fields
+        end
         res = quote
             abstract type $B <: $A end
         end
@@ -109,6 +113,10 @@ function getproperty(value::Type{<:AbstractStruct}, name::Symbol)
 end
 
 end
+
+# TODO fieldmethods
+
+# TODO @autofields = @fieldmethods @kwdef @inheritfields
 
 # TODO parametric types? if not possible:
 # macro abstractfields(ex)
