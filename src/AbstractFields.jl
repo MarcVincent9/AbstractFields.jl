@@ -1,6 +1,6 @@
 module AbstractFields
 
-export @abstractfields, @inheritfields
+export @abstractfields, @inheritfields, @getters, @setters
 
 import Base: fieldnames, fieldname, hasfield, fieldcount, getproperty
 
@@ -34,25 +34,54 @@ macro abstractfields(ex)
 end
 
 macro inheritfields(ex)
-    @capture(ex, struct B_ <: A_ fields__ end) || error(
-        "@inheritfields takes a struct subtype declaration as argument")
-    A in keys(_abstractfields_dict) || error(
-        "invalid subtyping in definition of $T: 
-        parent type $A must be declared with @abstractfields")
-    res = quote
-        struct $B <: $A
-            $(_abstractfields_dict[A]...)
-            $(fields...)
+    if @capture(ex, mutable struct B_ <: A_ fields__ end)
+        A in keys(_abstractfields_dict) || error(
+            "invalid subtyping in definition of $T: 
+            parent type $A must be declared with @abstractfields")
+        res = quote
+            mutable struct $B <: $A
+                $(_abstractfields_dict[A]...)
+                $(fields...)
+            end
+        end
+    else
+        @capture(ex, struct B_ <: A_ fields__ end) || error(
+            "@inheritfields takes a (mutable) struct subtype declaration as argument")
+        A in keys(_abstractfields_dict) || error(
+            "invalid subtyping in definition of $T: 
+            parent type $A must be declared with @abstractfields")
+        res = quote
+            struct $B <: $A
+                $(_abstractfields_dict[A]...)
+                $(fields...)
+            end
         end
     end
     esc(res) # evaluate in the macro call environment to find parent type
 end
 
-macro fieldgetters(ex)
-    @capture(ex, struct T_ fields__ end) || error(
-        "@fieldgetters takes a struct declaration as argument")
+macro getters(ex)
+    @capture(ex, mutable struct T_ fields__ end) ||
+        @capture(ex, struct T_ fields__ end) || error(
+        "@getters takes a (mutable) struct declaration as argument")
     T = @capture(T, A_ <: _) ? A : T
-    functions = [:($f(x::$T) = getfield(x, $(Meta.quot(f)))) for f in fields]
+    functions = [:($name(x::$T) = getfield(x, $(Meta.quot(name)))) 
+        for name in map(getname, fields)]
+    res = quote
+        $ex
+        $(functions...)
+        nothing # don't show last method in REPL
+    end
+    esc(res) # declare methods in the macro call scope
+end
+
+macro setters(ex)
+    @capture(ex, mutable struct T_ fields__ end) || error(
+        "@setters takes a mutable struct declaration as argument")
+    T = @capture(T, A_ <: _) ? A : T
+    functions = [
+        :($(Symbol("set_$(name)!"))(x::$T, value) = setproperty!(x, $(Meta.quot(name)), value))
+        for name in map(getname, fields)]
     res = quote
         $ex
         $(functions...)
@@ -123,7 +152,13 @@ end
 
 end
 
-# TODO account for mutable struct
+# TODO @fieldmethods @kwdef mutable struct A
+#   x::Getter{Int} = 1
+#   y::Setter # only if mutable
+#   z = 3
+#   w::GetterSetter
+#   v::String
+#end
 
 # TODO parametric types? if not possible:
 # macro abstractfields(ex)

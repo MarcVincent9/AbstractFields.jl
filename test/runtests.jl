@@ -33,12 +33,17 @@ end
     end
     @testall(FooBar, (:x, :y, :w, :z), Core.svec(Int64, Any, String, Any))
 
-    struct BarFoo <: Foo
+    @getters struct BarFoo <: Foo
         x::Int
         # drop y
         a
     end
     @testall(BarFoo, (:x, :a), Core.svec(Int64, Any))
+    @testset "getters" begin
+    	fb = BarFoo(1, 2)
+    	@test fb.x == 1
+    	@test fb.a == 2
+    end
     
     # TODO
     #@inheritfields struct BarFoo2 <: Foo
@@ -58,7 +63,7 @@ end
     @testall(FooFoo, (:x, :y), Core.svec(Int64, Any))
     
     #@kwdef # TODO
-    @inheritfields struct BarBar <: FooFoo
+    @inheritfields mutable struct BarBar <: FooFoo
         z::Float64 # = 2.0
     end
     @testall(BarBar, (:x, :y, :z), Core.svec(Int64, Any, Float64))
