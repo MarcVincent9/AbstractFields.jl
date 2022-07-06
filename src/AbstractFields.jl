@@ -48,6 +48,19 @@ macro inheritfields(ex)
     esc(res) # evaluate in the macro call environment to find parent type
 end
 
+macro fieldgetters(ex)
+    @capture(ex, struct T_ fields__ end) || error(
+        "@fieldgetters takes a struct declaration as argument")
+    T = @capture(T, A_ <: _) ? A : T
+    functions = [:($f(x::$T) = getfield(x, $(Meta.quot(f)))) for f in fields]
+    res = quote
+        $ex
+        $(functions...)
+        nothing # don't show last method in REPL
+    end
+    esc(res) # declare methods in the macro call scope
+end
+
 
 macro invoke(ex)
     @capture(ex, f_(args__)) || error(
@@ -59,17 +72,13 @@ macro invoke(ex)
     esc(res)
 end
 
-function getfields(T::Type{<:AbstractStruct})
-    _abstractfields_dict[nameof(T)]
-end
+getfields(T::Type{<:AbstractStruct}) = _abstractfields_dict[nameof(T)]
 
-function getname(field::Union{Expr, Symbol})
-    (field isa Expr ? field.args[1] : field)::Symbol
-end
+getname(field::Symbol) = field
+getname(field::Expr) = (@capture(field, name_::T_); name)::Symbol
 
-function gettype(field::Union{Expr, Symbol})
-    (field isa Expr ? eval(field.args[2]) : Any)::Type
-end
+gettype(field::Symbol) = Any
+gettype(field::Expr) = (@capture(field, name_::T_); eval(T))::Type
 
 
 function fieldnames(T::Type{<:AbstractStruct})
@@ -114,9 +123,7 @@ end
 
 end
 
-# TODO fieldmethods
-
-# TODO @autofields = @fieldmethods @kwdef @inheritfields
+# TODO account for mutable struct
 
 # TODO parametric types? if not possible:
 # macro abstractfields(ex)
