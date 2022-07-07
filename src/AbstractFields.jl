@@ -61,33 +61,26 @@ macro inheritfields(ex)
 end
 
 macro getters(ex)
-    @capture(ex, mutable struct T_ fields__ end) ||
-        @capture(ex, struct T_ fields__ end) || error(
-        "@getters takes a (mutable) struct declaration as argument")
-    T = @capture(T, A_ <: _) ? A : T
-    functions = [:($name(x::$T) = getfield(x, $(Meta.quot(name)))) 
-        for name in map(getname, fields)]
+    T = Core.eval(__module__, ex)::Type # evaluate type name in macro call module
+    getters = [:($name(x::$ex) = getfield(x, $(Meta.quot(name)))) for name in fieldnames(T)]
     res = quote
-        $ex
-        $(functions...)
-        nothing # don't show last method in REPL
+        $(getters...)
+        nothing
     end
-    esc(res) # declare methods in the macro call scope
+    esc(res)
 end
 
 macro setters(ex)
-    @capture(ex, mutable struct T_ fields__ end) || error(
-        "@setters takes a mutable struct declaration as argument")
-    T = @capture(T, A_ <: _) ? A : T
-    functions = [
-        :($(Symbol("set_$(name)!"))(x::$T, value) = setproperty!(x, $(Meta.quot(name)), value))
-        for name in map(getname, fields)]
+    T = Core.eval(__module__, ex)::Type
+    ismutabletype(T) || error("type must be mutable to accept setters")
+    setters = [
+        :($(Symbol("set_$(name)!"))(x::$ex, value) = setproperty!(x, $(Meta.quot(name)), value))
+        for name in fieldnames(T)]
     res = quote
-        $ex
-        $(functions...)
-        nothing # don't show last method in REPL
+        $(setters...)
+        nothing
     end
-    esc(res) # declare methods in the macro call scope
+    esc(res)
 end
 
 
@@ -152,7 +145,7 @@ end
 
 end
 
-# TODO @fieldmethods @kwdef mutable struct A
+# TODO @concrete mutable struct A
 #   x::Getter{Int} = 1
 #   y::Setter # only if mutable
 #   z = 3
