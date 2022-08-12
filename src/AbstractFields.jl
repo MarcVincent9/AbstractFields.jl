@@ -2,15 +2,17 @@ module AbstractFields
 
 export @abstractfields, @inheritfields, @getters, @setters
 
-import Base: fieldnames, fieldname, hasfield, fieldcount, getproperty
+import Base: @invoke, fieldnames, fieldname, hasfield, fieldcount, getproperty
 
 using MacroTools
 
 
 abstract type AbstractStruct end
 
-_abstractfields_dict = Dict{Symbol, Array{Union{Expr, Symbol}}}()
+_abstractfields_dict = Dict{Symbol, Array{Union{Expr, Symbol}}}() # TODO getindex: default=[]
 
+
+# TODO filter constructors out of fields (look for 'new' or type name)
 
 macro abstractfields(ex)
     @capture(ex, struct T_ fields__ end) || error(
@@ -33,6 +35,7 @@ macro abstractfields(ex)
     end
 end
 
+# TODO in capture: (macro struct) | struct
 macro inheritfields(ex)
     if @capture(ex, mutable struct B_ <: A_ fields__ end)
         A in keys(_abstractfields_dict) || error(
@@ -84,16 +87,6 @@ macro setters(ex)
 end
 
 
-macro invoke(ex)
-    @capture(ex, f_(args__)) || error(
-        "@invoke takes a function call as argument")
-    types = map(x -> @capture(x, _::T_) ? T : :Any, args)
-    res = quote
-        invoke($f, Tuple{$(types...)}, $(args...))
-    end
-    esc(res)
-end
-
 getfields(T::Type{<:AbstractStruct}) = _abstractfields_dict[nameof(T)]
 
 getname(field::Symbol) = field
@@ -104,35 +97,23 @@ gettype(field::Expr) = (@capture(field, name_::T_); eval(T))::Type
 
 
 function fieldnames(T::Type{<:AbstractStruct})
-    if isabstracttype(T)
-        Tuple(map(getname, getfields(T)))
-    else
-        @invoke fieldnames(T::DataType)
-    end
+    isabstracttype(T) && return Tuple(map(getname, getfields(T)))
+    @invoke fieldnames(T::DataType)
 end
 
 function fieldname(T::Type{<:AbstractStruct}, i::Integer)
-    if isabstracttype(T)
-        getname(getfields(T)[i])::Symbol
-    else
-        @invoke fieldname(T::DataType, i::Integer)
-    end
+    isabstracttype(T) && return getname(getfields(T)[i])::Symbol
+    @invoke fieldname(T::DataType, i::Integer)
 end
 
 function hasfield(T::Type{<:AbstractStruct}, name::Symbol)
-    if isabstracttype(T)
-        name in map(getname, getfields(T))
-    else
-        @invoke hasfield(T::DataType, name::Symbol)
-    end
+    isabstracttype(T) && return name in map(getname, getfields(T))
+    @invoke hasfield(T::DataType, name::Symbol)
 end
 
 function fieldcount(T::Type{<:AbstractStruct})
-    if isabstracttype(T)
-        length(getfields(T))
-    else
-        @invoke fieldcount(T::DataType)
-    end
+    isabstracttype(T) && return length(getfields(T))
+    @invoke fieldcount(T::DataType)
 end
 
 function getproperty(value::Type{<:AbstractStruct}, name::Symbol)
@@ -149,7 +130,6 @@ end
 #   x::Getter{Int} = 1
 #   y::Setter # only if mutable
 #   z = 3
-#   w::GetterSetter
 #   v::String
 #end
 
